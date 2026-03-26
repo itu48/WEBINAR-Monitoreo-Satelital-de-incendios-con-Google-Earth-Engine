@@ -1,0 +1,71 @@
+/**
+ * Análisis Multitemporal de Índices (Antes vs Después)
+ */
+
+if (typeof geometry !== 'undefined') {
+
+  // 1. CONFIGURACIÓN DE FECHAS
+  var pre_inicio = '2019-05-01';
+  var pre_fin    = '2019-06-01';
+  var post_inicio = '2019-09-01';
+  var post_fin    = '2019-10-01';
+
+  // 2. FUNCIÓN PARA CALCULAR ÍNDICES
+  var calcularIndices = function(inicio, fin, nombre) {
+    var img = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+      .filterBounds(geometry)
+      .filterDate(inicio, fin)
+      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 10))
+      .median()
+      .clip(geometry);
+
+    var ndvi = img.normalizedDifference(['B8', 'B4']).rename('NDVI_' + nombre);
+    var nbr = img.normalizedDifference(['B8', 'B12']).rename('NBR_' + nombre);
+    
+    // Devolvemos la imagen original con los índices añadidos como bandas extra
+    return img.addBands([ndvi, nbr]);
+  };
+
+  // 3. PROCESAR AMBOS PERIODOS
+  var antes = calcularIndices(pre_inicio, pre_fin, 'Antes');
+  var despues = calcularIndices(post_inicio, post_fin, 'Despues');
+
+  // 4. CÁLCULO DE DIFERENCIA (dNBR)
+  // El dNBR indica la severidad del incendio: valores altos = más daño
+  var dNBR = antes.select('NBR_Antes').subtract(despues.select('NBR_Despues')).rename('dNBR');
+
+  // 5. VISUALIZACIÓN
+  Map.centerObject(geometry, 12);
+
+  // Paletas de colores
+  var visNDVI = {min: 0, max: 0.8, palette: ['red', 'yellow', 'green']};
+  var visDNBR = {min: -0.1, max: 0.5, palette: ['green', 'yellow', 'orange', 'red']};
+
+  // Añadir capas al mapa
+  Map.addLayer(antes.select('NDVI_Antes'), visNDVI, '1. NDVI Antes');
+  Map.addLayer(despues.select('NDVI_Despues'), visNDVI, '2. NDVI Después');
+  Map.addLayer(dNBR, visDNBR, '3. Severidad del Quemado (dNBR)');
+  
+  // Imagen en falso color para ver el humo/fuego
+  Map.addLayer(despues, {bands: ['B12', 'B8', 'B4'], min: 0, max: 4000}, '4. Falso Color Después');
+
+  // 6. EXPORTACIÓN MULTIBANDA
+  // Exportamos un solo archivo con los índices de ambos periodos
+  var exportImage = antes.select(['NDVI_Antes', 'NBR_Antes'])
+    .addBands(despues.select(['NDVI_Despues', 'NBR_Despues']))
+    .addBands(dNBR);
+
+  Export.image.toDrive({
+    image: exportImage,
+    description: 'Comparativa_Indices_Antes_Despues',
+    folder: 'GEE_Analisis',
+    region: geometry,
+    scale: 10,
+    maxPixels: 1e13
+  });
+
+  print('Análisis completo cargado. El dNBR resalta en ROJO las zonas con mayor pérdida de biomasa.');
+
+} else {
+  print('⚠️ Dibuja un polígono antes de dar a RUN.');
+}
