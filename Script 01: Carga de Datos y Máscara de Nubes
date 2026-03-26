@@ -30,13 +30,13 @@ if (typeof geometry !== 'undefined') {
   // ['B11', 'B8', 'B2'] ESTRES HIDRICO
   // ['B12', 'B8A', 'B4'] FUEGO NARANJA- BRILLO
   var visIncendio = {
-    bands: ['B12', 'B8', 'B4'],
+    bands: ['B4', 'B3', 'B2'],
     min: 0,
     max: 4000
   };
 
   // --- MOSTRAR EN EL MAPA ---
-  Map.centerObject(geometry, 10);
+  Map.centerObject(geometry, 7);
   
   // Añadimos las dos capas (puedes activarlas/desactivarlas a la derecha)
   Map.addLayer(antes, visIncendio, '1. Antes del Fuego');
